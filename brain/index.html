@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Alzheimer's MRI Classifier</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f5f3ef;
+    --surface: #ffffff;
+    --border: #e2ddd6;
+    --border-strong: #c9c3ba;
+    --text: #1a1815;
+    --text-muted: #7a736a;
+    --text-faint: #b0a89e;
+    --accent: #2d5a3d;
+    --accent-light: #e8f2eb;
+    --warn: #8a5a1a;
+    --warn-light: #fdf3e3;
+    --danger: #8a2020;
+    --danger-light: #fde8e8;
+    --severe: #5a1010;
+    --severe-light: #f8dddd;
+    --font: 'DM Sans', system-ui, sans-serif;
+    --mono: 'DM Mono', monospace;
+  }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 3rem 1rem;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 2.5rem;
+    max-width: 520px;
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-bottom: 10px;
+  }
+
+  h1 {
+    font-size: 28px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+    color: var(--text);
+    margin-bottom: 10px;
+  }
+
+  header p {
+    font-size: 14px;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    width: 100%;
+    max-width: 520px;
+    padding: 2rem;
+  }
+
+  /* Drop zone */
+  #drop-zone {
+    border: 1.5px dashed var(--border-strong);
+    border-radius: 12px;
+    padding: 2rem 1.5rem;
+    text-align: center;
+    cursor: pointer;
+    position: relative;
+    transition: border-color 0.2s, background 0.2s;
+    background: var(--bg);
+  }
+
+  #drop-zone:hover, #drop-zone.drag-over {
+    border-color: var(--accent);
+    background: var(--accent-light);
+  }
+
+  #drop-zone input[type=file] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+
+  .upload-icon {
+    width: 40px; height: 40px;
+    margin: 0 auto 12px;
+    border-radius: 10px;
+    background: var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+
+  #drop-text p { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+  #drop-text strong { font-size: 14px; font-weight: 500; color: var(--text); }
+
+  #preview-img {
+    max-width: 200px; max-height: 200px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    object-fit: cover;
+    display: none;
+    margin: 0 auto 12px;
+  }
+
+  #change-btn {
+    font-size: 12px;
+    font-family: var(--font);
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-decoration: underline;
+    display: none;
+    margin-top: 8px;
+  }
+
+  /* Analyze button */
+  #analyze-btn {
+    width: 100%;
+    margin-top: 1.25rem;
+    padding: 11px;
+    font-size: 14px;
+    font-weight: 500;
+    font-family: var(--font);
+    border-radius: 10px;
+    border: 1px solid var(--border-strong);
+    background: var(--text);
+    color: #fff;
+    cursor: pointer;
+    display: none;
+    transition: opacity 0.2s;
+    letter-spacing: 0.01em;
+  }
+
+  #analyze-btn:hover { opacity: 0.85; }
+  #analyze-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* Status */
+  #status {
+    font-size: 12px;
+    font-family: var(--mono);
+    color: var(--text-faint);
+    margin-top: 10px;
+    min-height: 16px;
+    text-align: center;
+  }
+
+  /* Results */
+  #result-section {
+    display: none;
+    margin-top: 1.75rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .result-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 1.25rem;
+    gap: 12px;
+  }
+
+  #top-label {
+    font-size: 19px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    line-height: 1.3;
+  }
+
+  .conf-pill {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 500;
+    padding: 4px 10px;
+    border-radius: 99px;
+    white-space: nowrap;
+    margin-top: 3px;
+    flex-shrink: 0;
+  }
+
+  .class-row { margin-bottom: 12px; }
+
+  .class-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 5px;
+  }
+
+  .class-name {
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  .class-pct {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  .bar-track {
+    height: 6px;
+    background: var(--bg);
+    border-radius: 99px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+
+  .bar-fill {
+    height: 100%;
+    border-radius: 99px;
+    transition: width 0.7s cubic-bezier(.4,0,.2,1);
+  }
+
+  /* Color scheme per class */
+  .c0 { background: #2d5a3d; }
+  .c1 { background: #8a7a1a; }
+  .c2 { background: #8a4a1a; }
+  .c3 { background: #8a2020; }
+
+  .pill-0 { background: var(--accent-light); color: var(--accent); }
+  .pill-1 { background: var(--warn-light); color: var(--warn); }
+  .pill-2 { background: var(--danger-light); color: var(--danger); }
+  .pill-3 { background: var(--severe-light); color: var(--severe); }
+
+  .disclaimer {
+    margin-top: 1.5rem;
+    font-size: 11px;
+    color: var(--text-faint);
+    text-align: center;
+    line-height: 1.6;
+  }
+
+  footer {
+    margin-top: 2.5rem;
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--text-faint);
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <p class="eyebrow">EfficientNetB0 &bull; 4-class classification</p>
+  <h1>Alzheimer's MRI Classifier</h1>
+  <p>Upload a brain MRI scan to detect the stage of cognitive decline using a deep learning model.</p>
+</header>
+
+<div class="card">
+  <div id="drop-zone">
+    <input type="file" id="file-input" accept="image/*">
+    <img id="preview-img" alt="MRI Preview">
+    <div id="drop-text">
+      <div class="upload-icon">&#8679;</div>
+      <strong>Drop MRI image here</strong>
+      <p>or click to browse &mdash; JPG, PNG, WEBP</p>
+    </div>
+    <button id="change-btn" onclick="resetUpload(event)">Change image</button>
+  </div>
+
+  <button id="analyze-btn" onclick="runAnalysis()">Analyze MRI &rarr;</button>
+  <div id="status"></div>
+
+  <div id="result-section">
+    <div class="result-header">
+      <div id="top-label"></div>
+      <span class="conf-pill" id="conf-pill"></span>
+    </div>
+    <div id="bars"></div>
+    <p class="disclaimer">For research purposes only. Not a clinical diagnostic tool.</p>
+  </div>
+</div>
+
+<footer>Model: alzheimer_cnn_efficientnetb0.h5</footer>
+
+<script>
+  // ⚠️ Replace with your EC2 public IP or domain
+  const API_URL = "http://YOUR_EC2_IP:8000/predict";
+
+  const CLASSES = ["Non Demented", "Very Mild Demented", "Mild Demented", "Moderate Demented"];
+  const BAR_CLASSES = ["c0", "c1", "c2", "c3"];
+  const PILL_CLASSES = ["pill-0", "pill-1", "pill-2", "pill-3"];
+
+  let currentFile = null;
+
+  const fileInput = document.getElementById("file-input");
+  const dropZone = document.getElementById("drop-zone");
+  const previewImg = document.getElementById("preview-img");
+  const dropText = document.getElementById("drop-text");
+  const changeBtn = document.getElementById("change-btn");
+  const analyzeBtn = document.getElementById("analyze-btn");
+  const status = document.getElementById("status");
+
+  fileInput.addEventListener("change", e => handleFile(e.target.files[0]));
+
+  dropZone.addEventListener("dragover", e => {
+    e.preventDefault();
+    dropZone.classList.add("drag-over");
+  });
+  dropZone.addEventListener("dragleave", () => dropZone.classList.remove("drag-over"));
+  dropZone.addEventListener("drop", e => {
+    e.preventDefault();
+    dropZone.classList.remove("drag-over");
+    handleFile(e.dataTransfer.files[0]);
+  });
+
+  function handleFile(file) {
+    if (!file || !file.type.startsWith("image/")) return;
+    currentFile = file;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      previewImg.src = ev.target.result;
+      previewImg.style.display = "block";
+      dropText.style.display = "none";
+      changeBtn.style.display = "inline-block";
+      analyzeBtn.style.display = "block";
+      document.getElementById("result-section").style.display = "none";
+      status.textContent = "";
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function resetUpload(e) {
+    e.stopPropagation();
+    currentFile = null;
+    previewImg.style.display = "none";
+    previewImg.src = "";
+    dropText.style.display = "block";
+    changeBtn.style.display = "none";
+    analyzeBtn.style.display = "none";
+    document.getElementById("result-section").style.display = "none";
+    status.textContent = "";
+    fileInput.value = "";
+  }
+
+  async function runAnalysis() {
+    if (!currentFile) return;
+    analyzeBtn.disabled = true;
+    status.textContent = "Sending to model...";
+    document.getElementById("result-section").style.display = "none";
+
+    const formData = new FormData();
+    formData.append("file", currentFile);
+
+    try {
+      const res = await fetch(API_URL, { method: "POST", body: formData });
+      if (!res.ok) throw new Error("Server error: " + res.status);
+      const data = await res.json();
+      showResults(data);
+    } catch (err) {
+      status.textContent = "Error: " + err.message;
+    } finally {
+      analyzeBtn.disabled = false;
+    }
+  }
+
+  function showResults(data) {
+    status.textContent = "";
+    const topIdx = CLASSES.indexOf(data.prediction);
+
+    document.getElementById("top-label").textContent = data.prediction;
+
+    const pill = document.getElementById("conf-pill");
+    pill.textContent = data.confidence.toFixed(1) + "%";
+    pill.className = "conf-pill " + PILL_CLASSES[topIdx];
+
+    const bars = document.getElementById("bars");
+    bars.innerHTML = CLASSES.map((cls, i) => {
+      const pct = data.probabilities[cls] !== undefined ? data.probabilities[cls] : 0;
+      return `
+        <div class="class-row">
+          <div class="class-meta">
+            <span class="class-name">${cls}</span>
+            <span class="class-pct">${pct.toFixed(1)}%</span>
+          </div>
+          <div class="bar-track">
+            <div class="bar-fill ${BAR_CLASSES[i]}" style="width: ${pct.toFixed(1)}%"></div>
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    document.getElementById("result-section").style.display = "block";
+  }
+</script>
+</body>
+</html>
